@@ -32,5 +32,40 @@ RUN set -x \
 	&& rm bin/*.bat \
 	&& rm tomcat.tar.gz*
 
+ENV TCNATIVE_VERSION=1.1.33
+ENV TCNATIVE_TGZ_URL=http://www.us.apache.org/dist/tomcat/tomcat-connectors/native/$TCNATIVE_VERSION/source/tomcat-native-$TCNATIVE_VERSION-src.tar.gz
+
+RUN set -x \
+	&& apt-get update \
+	&& apt-get install -y libapr1 \
+	&& rm -rf /var/lib/apt/lists/*
+
+RUN buildDeps=' \
+	gcc \
+	libapr1-dev \
+	libssl-dev \
+	openjdk-7-jdk='"$JAVA_DEBIAN_VERSION"' \
+	make \
+	' \
+	&& set -x \
+	&& apt-get update \
+	&& apt-get install -y --no-install-recommends $buildDeps \
+	&& curl -fSL "$TCNATIVE_TGZ_URL" -o /tmp/tcnative.tar.gz \
+	&& curl -fSL "$TCNATIVE_TGZ_URL.asc" -o /tmp/tcnative.tar.gz.asc \
+	&& gpg --verify /tmp/tcnative.tar.gz.asc \
+	&& mkdir -p /usr/src/tcnative \
+	&& cd /usr/src/tcnative \
+	&& tar -xvf /tmp/tcnative.tar.gz --strip-components=1 \
+	&& cd jni/native \
+	&& ./configure \
+		--with-apr=/usr/bin/apr-config \
+		--with-java-home=/usr/lib/jvm/java-7-openjdk-amd64 \
+		--with-ssl=yes \
+		--prefix="$CATALINA_HOME" \
+	&& make \
+	&& make install \
+	&& apt-get purge -y --auto-remove $buildDeps \
+	&& rm -rf /tmp/tcnative.tar.gz* /usr/src/tcnative /var/lib/apt/lists/*
+
 EXPOSE 8080
 CMD ["catalina.sh", "run"]
